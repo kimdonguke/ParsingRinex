@@ -14,8 +14,8 @@ return_OBS = parsingObsBody(obs_data);
 
 %% Navigation Parsing %%
 %======================%
-%Indexing by sorted PRN(satellite ID)
-%Input : Rinex file
+%Indexing by sorted PRN(satellite ID) and rematch format
+%Input : Navigation Body.GPS(timetable)
 %Output : (PRN * 1) cell
 %======================%
 function [return_NAV] = parsingNavigationBody(nav_data)
@@ -46,6 +46,13 @@ function [group] = groupingTable(dataTable, varName)
     end
 end
 
+
+%% Obs Parsing %%
+%======================%
+%refactor table
+%Input : Obs body.GPS(timetable)
+%Output : Obs body(table)
+%======================%
 function flatObsTable = parsingObsBody(rawObs)
     rawObs = timetable2table(rawObs.GPS);
     % parseObsToFlatTable
@@ -122,9 +129,12 @@ function flatObsTable = parsingObsBody(rawObs)
     % flatObsTable = rmmissing(flatObsTable, 'DataVariables', {'P1', 'L1'});
 end
 
-% -------------------------------------------------------
-% 헬퍼 함수: 컬럼이 존재하면 가져오고, 없으면 NaN 벡터 반환
-% -------------------------------------------------------
+%% Obs Paring Helper function %%
+%======================%
+%check colomn class and is column empty and return NAN vector
+%Input : table, variable name
+%Output : column vector
+%======================%
 function val = getCol(tbl, varName)
     if ismember(varName, tbl.Properties.VariableNames)
         val = tbl.(varName);
