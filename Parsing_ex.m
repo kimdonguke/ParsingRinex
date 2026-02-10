@@ -1,10 +1,10 @@
 clear;
 clc;
 
-addpath("C:\Users\김동욱\OneDrive\Desktop\GNSSLAB\2026-동계방학\Study_1\ParsingRinex\data");
+addpath(".\data");
 addpath(genpath('data'));
 load('Nav.mat');
-load('Obs_1hour.mat')
+
 
 [nav_data, nav_header] = rinexread("BRDC00IGS_R_20253590000_01D_MN.rnx");
 [obs_data, obs_header] = rinexread("YONS00KOR_R_20253590000_01D_30S_MO.rnx");
