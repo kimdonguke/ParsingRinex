@@ -71,6 +71,10 @@ function [obsTable, outlierTable] = calcMultipathComb(obsTable)
     % -------------------------------------------------------
     % 정상적으로 계산된 데이터에 대해서만 바이어스 제거 수행
     obsTable.MP_Hybrid = applyDetrending(obsTable, raw_MP, method_flag);
+    
+    % ※※※ 생 데이터 뽑는용도 ※※※
+    obsTable.MP_Hybrid = raw_MP;
+    
     obsTable.MP_Method = method_flag;
     
     fprintf('전체 파이프라인 완료 (Dual Only).\n');
