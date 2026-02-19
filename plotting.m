@@ -4,12 +4,11 @@ title("Dual Frequency MP (L1-L2)")
 hold on
 grid on
 
-% PRN 개수만큼 반복 (MPcell 크기에 맞춰 자동 조절)
+% 전체 결과 출력
 numSats = length(MPcell);
 for i = 1:numSats
     if isempty(MPcell{i}), continue; end
     
-    % MP_Method == 2 (Dual)인 것만 플롯 (사실상 전 데이터가 2번임)
     valid_idx = MPcell{i}.MP_Method == 2;
     if any(valid_idx)
         plot(MPcell{i}.Time(valid_idx), MPcell{i}.MP_Hybrid(valid_idx), 'o', 'MarkerSize', 2);
@@ -17,3 +16,21 @@ for i = 1:numSats
 end
 xlabel('Time'); ylabel('MP (m)');
 
+
+
+
+% 위성별 결과 출력
+numSats = length(MPcell);
+for i = 1:numSats
+    figure
+    title("Dual Frequency MP (L1-L2)")
+    grid on
+    if isempty(MPcell{i}), continue; end
+    
+    valid_idx = MPcell{i}.MP_Method == 2;
+    if any(valid_idx)
+        plot(MPcell{i}.Time(valid_idx), MPcell{i}.MP_Hybrid(valid_idx), 'o', 'MarkerSize', 2);
+    end
+    xlim([1766620800 1766707140])
+end
+xlabel('Time'); ylabel('MP (m)');
