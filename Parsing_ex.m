@@ -9,7 +9,7 @@ load('Nav.mat');
 [nav_data, nav_header] = rinexread("BRDC00IGS_R_20253590000_01D_MN.rnx");
 [obs_data, obs_header] = rinexread("YONS00KOR_R_20253590000_01D_30S_MO.rnx");
 
-retrun_NAV = parsingNavigationBody(nav_data);
+return_NAV = parsingNavigationBody(nav_data);
 return_OBS = parsingObsBody(obs_data);
 
 %% Navigation Parsing %%
