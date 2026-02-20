@@ -1,11 +1,14 @@
 tic
-ttx = clock_Correction(OBS_grouped,retrun_NAV);
-ttx_PRN = groupingTable(ttx,'PRN');
+fprintf("satellite positioning start....\n")
+[ttx_epoch, ttx_table] = clock_Correction(return_OBS,return_NAV);
+xyz_epoch = sat_setting(return_NAV, ttx_epoch);   % Nav(table), ttx(cell grouped by epoch)
+xyz_table = sat_setting2(return_NAV, ttx_table);  % Nav(table), ttx(table ungrouped)
+fprintf("satellite positioning finish. \n")
 toc
 
 
 %%%% SV Clock Correction %%%%
-function [ttx_cell] = clock_Correction(Obs,Nav)  % ttx_cell{i,1} = time, ttx_cell{i,2}=satellite number
+function [ttx_epoch, ttx_table] = clock_Correction(Obs,Nav)  % ttx_cell{i,1} = time, ttx_cell{i,2}=satellite number
     %% get Obs data %%
     %sObs=table2array(Obs);
     c=299792458;                    % speed of light(meter/sec)
@@ -16,8 +19,10 @@ function [ttx_cell] = clock_Correction(Obs,Nav)  % ttx_cell{i,1} = time, ttx_cel
     L2 = 1227.60;                   % L2 주파수
     mu2 = (L1/L2)^2;                % TGD 계수
     
+    Obs = groupingTable(Obs, 'Time');
     
-    ttx_cell=[];
+    ttx_list = [];
+    ttx_epoch=cell(height(Obs),1);
     
     
     for i=1:height(Obs) % iteration by whole grouped data
@@ -78,34 +83,31 @@ function [ttx_cell] = clock_Correction(Obs,Nav)  % ttx_cell{i,1} = time, ttx_cel
                 ttx_new=t_SV-delt_SV;
              end
              P(j)=P(j)+c*delt_SV;
-             % if obs_i.code(j) == 5
-             %     P(j)=P(j)-Dcb{PRN(j)}.dcb(1); %% 수정 필요 
-             % end
-             % if(j~=0)
-             %    disp(ttx_new)
-             %    disp(datetime(ttx_new,'ConvertFrom','posixtime'))
-             %    disp("============ conv ==========")
-             % end
              TTX(j)=ttx_new;
         end
 
-        ttx_cell=[ttx_cell; [PRN,TTX,P,SNR]];
+        ttx_epoch{i}=table(PRN,TTX,P,SNR);
+        ttx_list=[ttx_list; [PRN,TTX,P,SNR]];
     end
-    PRN = ttx_cell(:,1);
-    TTX = ttx_cell(:,2);
-    P = ttx_cell(:,3);
-    SNR = ttx_cell(:,4);
-    ttx_cell = table(PRN,TTX,P,SNR);
+    PRN = ttx_list(:,1);
+    TTX = ttx_list(:,2);
+    P = ttx_list(:,3);
+    SNR = ttx_list(:,4);
+    ttx_table = table(PRN,TTX,P,SNR);
 end
 
 %%%%% sattelite Positioning function %%%%%
-function [x y z] = sat_Positioning(Nav, ttx, P,sat_numbering)
+function [x y z] = sat_Positioning(Nav, TTX)
     c=299792458;                    % speed of light(meter/sec)
     tolerance = 1e-12;              %convergence threshold
     mu=3.986005e+14;                % earth's gravitational constant meter^3/sec^2
     OMGd_earth=7.2921151467e-5;     % earth rotation rate (rad/sec)
+    
+    ttx = TTX.TTX;
+    P = TTX.P;
+    sat_numbering = TTX.PRN;
+    
     del_t = P./c;
-    %disp("???//////////////////////////////////////////////////////")
     
     fixed_time = ttx; %fixed time;
     
@@ -176,3 +178,42 @@ function [x y z] = sat_Positioning(Nav, ttx, P,sat_numbering)
 end
 
 
+function [returnSatList] = sat_setting(Nav, ttx)
+
+    Re = 6378137;      % 지구 반지름
+    hm = 350000;       % 전리층 고도 (350km)
+   
+        
+    sat_xyzlist=cell(height(ttx),1);
+    
+    for i=1:height(ttx)
+        
+        [x, y, z]=sat_Positioning(Nav,ttx{i}); %ttx_list, %grouped sat Obs Data
+        PRN=ttx{i}.PRN;
+        
+        [az, el] = getAzEl(x,y,z);
+        sat_xyzlist{i} = table(PRN,x,y,z,az,el);
+    end
+    returnSatList=sat_xyzlist;
+end
+
+function returnSatlist = sat_setting2(Nav, ttx)
+    PRN = ttx.PRN;
+    [x, y, z] = sat_Positioning(Nav,ttx);
+    [az, el] = getAzEl(x,y,z);
+    returnSatlist = table(PRN, x,y,z,az,el);
+end
+
+
+function [az, el] = getAzEl(x, y, z)
+    ref_position=[-3047507.380, 4043980.305, 3865242.828];
+    ref_position=ecef2lla(ref_position);
+    ref_positionRAD=deg2rad(ref_position);
+    
+    [enu]=lla2enu(ecef2lla([x y z]),ref_position,'ellipsoid');
+    e=enu(:,1);
+    n=enu(:,2);
+    u=enu(:,3);
+    az=atan2(e,n);
+    el = atan2(u,sqrt(e.^2+n.^2));     %calculate azimuth, elevation angle
+end
