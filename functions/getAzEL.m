@@ -1,4 +1,4 @@
-function [az, el] = getAzEl(x, y, z)
+function [az, el] = getAzEL(x, y, z)
     ref_position=[-3047507.380, 4043980.305, 3865242.828];
     ref_position=ecef2lla(ref_position);
     ref_positionRAD=deg2rad(ref_position);
