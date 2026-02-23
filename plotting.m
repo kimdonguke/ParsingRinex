@@ -1,12 +1,11 @@
 fprintf("F5 또 잘못 눌렀어용~/n");
 
 function a=aaaa()
-    %%% Plotting (Dual Frequency 결과만 출력)
+    %%% MP hybrid 출력
     figure
     title("Dual Frequency MP (L1-L2)")
     hold on
     grid on
-    
     % 전체 결과 출력
     numSats = length(MPcell);
     for i = 1:numSats
@@ -19,10 +18,25 @@ function a=aaaa()
     end
     xlabel('Time'); ylabel('MP (m)');
     
+    %%% MP raw 출력
+    figure
+    title("Dual Frequency MP raw(bias O)")
+    hold on
+    grid on
+    % 전체 결과 출력
+    numSats = length(MPcell);
+    for i = 1:numSats
+        if isempty(MPcell{i}), continue; end
+        
+        valid_idx = MPcell{i}.MP_Method == 2;
+        if any(valid_idx)
+            plot(MPcell{i}.Time(valid_idx), MPcell{i}.MP_raw(valid_idx), 'o', 'MarkerSize', 2);
+        end
+    end
+    xlabel('Time'); ylabel('MP (m)');
     
     
-    
-    % 위성별 결과 출력
+    % MP hybrid 위성별 결과 출력
     numSats = length(MPcell);
     for i = 1:numSats
         figure
@@ -34,7 +48,7 @@ function a=aaaa()
         if any(valid_idx)
             plot(MPcell{i}.Time(valid_idx), MPcell{i}.MP_Hybrid(valid_idx), 'o', 'MarkerSize', 2);
         end
-        xlim([1766620800 1766707140])
+        xlim([MPtable.Time(1) MPtable.Time(end)])
     end
     xlabel('Time'); ylabel('MP (m)');
     
@@ -70,24 +84,6 @@ function a=aaaa()
     ylim([-2.5 2.5]);
     xlabel('Elevation(degree)'); ylabel('MP (m)');
     
-    
-    % 3. SNR - MP-combination 개별 보기
-    numSats = length(MPcell);
-    for i = 1:numSats
-        figure
-        title("SNR - MP-combination")
-    
-        if isempty(MPcell{i}), continue; end
-        
-        valid_idx = MPcell{i}.MP_Method == 2;
-        if any(valid_idx)
-            plot(MPcell{i}.SNR1(valid_idx), MPcell{i}.MP_Hybrid(valid_idx), 'o', 'MarkerSize', 2);
-        end
-        grid on
-    end
-    xlabel('SNR'); ylabel('MP (m)');
-    
-    
     % 3-2. SNR - MP combination 결과 전체 보기
     figure
     hold on
@@ -117,6 +113,25 @@ function a=aaaa()
     end
     plot(ex_cell(:,1),ex_cell(:,2), 'ro', 'MarkerSize', 3, 'MarkerFaceColor','red')
 
+    
+    % 3. SNR - MP-combination 개별 보기
+    numSats = length(MPcell);
+    for i = 1:numSats
+        figure
+        title("SNR - MP-combination")
+    
+        if isempty(MPcell{i}), continue; end
+        
+        valid_idx = MPcell{i}.MP_Method == 2;
+        if any(valid_idx)
+            plot(MPcell{i}.SNR1(valid_idx), MPcell{i}.MP_Hybrid(valid_idx), 'o', 'MarkerSize', 2);
+        end
+        grid on
+    end
+    xlabel('SNR'); ylabel('MP (m)');
+    
+    
+  
     
     
     
