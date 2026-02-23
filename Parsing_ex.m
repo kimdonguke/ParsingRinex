@@ -1,10 +1,8 @@
 clear;
 clc;
 
-addpath(".\data");
 addpath(genpath('data'));
-load('Nav.mat');
-
+addpath(genpath('functions'));
 
 [nav_data, nav_header] = rinexread("BRDC00IGS_R_20253590000_01D_MN.rnx");
 [obs_data, obs_header] = rinexread("YONS00KOR_R_20253590000_01D_30S_MO.rnx");
@@ -23,27 +21,12 @@ function [return_NAV] = parsingNavigationBody(nav_data)
     navTable=timetable2table(navTable);
     navTable = sortrows(navTable,1);
     navTable = convertToRtkLibFormat(navTable);
-    return_NAV = groupingTable(navTable,'PRN');
+    return_NAV = groupingTable_PRN(navTable);
 end
 
 
 function [return_NAV] = parsingNavigationHeader(nav_header)
 
-end
-
-%% Table grouping %%
-%======================%
-% grouping Table by specific(parameter) column(satellite ID)
-%Input : Table class, colum name(string)
-%Output : (total Group Number * 1) cell
-%======================%
-function [group] = groupingTable(dataTable, varName)
-    parameterGroup=findgroups(dataTable.(varName));
-    num_group=length(unique(parameterGroup));
-    group = cell(num_group,1);
-    for i=1:num_group
-        group{i}=dataTable(parameterGroup==i,:);
-    end
 end
 
 
