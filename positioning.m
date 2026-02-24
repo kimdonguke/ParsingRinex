@@ -1,10 +1,112 @@
-tic
-fprintf("satellite positioning start....\n")
-[ttx_epoch, ttx_table] = clock_Correction(return_OBS,return_NAV);
-xyz_epoch = sat_setting(return_NAV, ttx_epoch);   % Nav(table), ttx(cell grouped by epoch)
-xyz_table = sat_setting2(return_NAV, ttx_table);  % Nav(table), ttx(table ungrouped)
-fprintf("satellite positioning finish. \n")
-toc
+clear; clc;
+addpath(genpath('functions')); % positioning.m 파일이 있는 폴더 경로
+
+parsed_dir = fullfile('data', 'PARSED_MAT');
+save_dir = fullfile('data', 'MP_RESULTS');
+if ~exist(save_dir, 'dir'), mkdir(save_dir); end
+
+fprintf('\n========================================\n');
+fprintf('[Start] MP 조합 + 위성 고도각 병합 일괄 처리 시작\n');
+fprintf('========================================\n');
+
+obs_parsed_files = dir(fullfile(parsed_dir, '*_MO_parsed.mat'));
+
+for i = 1:length(obs_parsed_files)
+    filename = obs_parsed_files(i).name;
+    filepath = fullfile(parsed_dir, filename);
+    
+    [~, name_only, ~] = fileparts(filename);
+    save_filename = strrep(name_only, '_parsed', '_MP'); 
+    save_path = fullfile(save_dir, strcat(save_filename, '.mat'));
+    
+    % 🔥 수정된 핵심 로직: 파일 존재 여부 + Az/El 컬럼 존재 여부 확인
+    need_processing = true; % 기본값: 처리가 필요함
+    
+    if exist(save_path, 'file')
+        % 파일이 있으면 잠시 로드해서 내부 구조 확인 (속도 빠름)
+        loaded_data = load(save_path, 'MPcell');
+        
+        % 데이터가 들어있는 첫 번째 유효한 위성(셀) 찾기
+        valid_idx = find(~cellfun(@isempty, loaded_data.MPcell), 1);
+        
+        if ~isempty(valid_idx)
+            % 해당 테이블의 컬럼 이름(VariableNames) 목록 추출
+            var_names = loaded_data.MPcell{valid_idx}.Properties.VariableNames;
+            
+            % 'el'과 'az' 컬럼이 모두 존재하는지 확인
+            if ismember('el', var_names) && ismember('az', var_names)
+                fprintf('  > [%02d/%02d] [PASS] Az/El 컬럼 확인 완료 (건너뜀): %s\n', i, length(obs_parsed_files), filename);
+                need_processing = false; % 처리 불필요, 패스!
+            else
+                fprintf('  > [%02d/%02d] [UPDATE] 구버전 감지. Az/El 추가를 위해 재처리합니다: %s\n', i, length(obs_parsed_files), filename);
+            end
+        end
+    end
+    
+    % 처리가 필요 없는 경우 다음 파일로 넘어감
+    if ~need_processing
+        continue;
+    end
+    
+    fprintf('  > [%02d/%02d] 계산 중: %s ... ', i, length(obs_parsed_files), filename);
+    
+    fprintf('  > [%02d/%02d] 계산 중: %s ... ', i, length(obs_parsed_files), filename);
+    
+    % 1. OBS 데이터 로드
+    load(filepath, 'return_OBS');
+    
+   % ==========================================================
+    % 2. 짝이 맞는 NAV 데이터 로드 (스마트 매칭 방식 적용)
+    % ==========================================================
+    % 파일명 예시: YONS00KOR_R_20260151004_01D_30S_MO_parsed.mat
+    
+    % '_R_' 문자열의 위치를 찾아서 그 뒤의 7글자(연도4 + DOY3)를 추출합니다.
+    idx = strfind(filename, '_R_');
+    if isempty(idx)
+        error('파일명 형식이 예상과 다릅니다: %s', filename);
+    end
+    
+    yyyy_doy = filename(idx+3 : idx+9); % 예: '2026015'
+    
+    % 추출한 날짜를 BRDC 정규 포맷에 끼워 넣어 완벽한 NAV 파일명을 만듭니다.
+    nav_filename = sprintf('BRDC00IGS_R_%s0000_01D_MN_parsed.mat', yyyy_doy);
+    nav_filepath = fullfile(parsed_dir, nav_filename); 
+    
+    % NAV 파일이 존재하는지 안전하게 확인 후 로드
+    if ~exist(nav_filepath, 'file')
+        fprintf('  > [경고] 짝이 맞는 NAV 파일이 없습니다: %s\n', nav_filename);
+        continue; % 에러를 내지 않고 다음 날짜로 넘어감
+    end
+    
+    load(nav_filepath, 'return_NAV');
+    % ==========================================================
+    
+    % 3. MP 조합 계산
+    [MPtable, OutlierTable] = calcMultipathComb(return_OBS);
+    
+    % 4. 위성 좌표 및 고도각(el) 계산 (수정된 함수들 호출)
+    [~, ttx_table] = clock_Correction(return_OBS, return_NAV);
+    xyz_table = sat_setting2(return_NAV, ttx_table);
+    
+    % 5. 💎 핵심: MPtable과 xyz_table을 Time과 PRN 기준으로 완벽하게 병합 (Inner Join)
+    % 중복되는 컬럼 없이 el, az, x, y, z 가 MPtable 옆에 예쁘게 달라붙습니다.
+    MPtable_Joined = innerjoin(MPtable, xyz_table, 'Keys', {'Time', 'PRN'});
+    
+    % 6. PRN 기준으로 그룹핑
+    MPcell = groupingTable(MPtable_Joined, 'PRN');
+    
+    if ~isempty(OutlierTable)
+        OutlierCell = groupingTable(OutlierTable, 'PRN');
+        outlier_count = height(OutlierTable);
+    else
+        OutlierCell = {}; outlier_count = 0;
+    end
+    
+    % 7. 최종 저장
+    save(save_path, 'MPcell', 'OutlierCell');
+    
+    fprintf('완료! (결측치: %d개)\n', outlier_count);
+end
 
 
 %%%% SV Clock Correction %%%%
@@ -87,13 +189,14 @@ function [ttx_epoch, ttx_table] = clock_Correction(Obs,Nav)  % ttx_cell{i,1} = t
         end
 
         ttx_epoch{i}=table(PRN,TTX,P,SNR);
-        ttx_list=[ttx_list; [PRN,TTX,P,SNR]];
+        ttx_list=[ttx_list; [obs_i.Time, PRN, TTX, P, SNR]];
     end
-    PRN = ttx_list(:,1);
-    TTX = ttx_list(:,2);
-    P = ttx_list(:,3);
-    SNR = ttx_list(:,4);
-    ttx_table = table(PRN,TTX,P,SNR);
+    Time = ttx_list(:,1); % Time 추가!
+    PRN  = ttx_list(:,2);
+    TTX  = ttx_list(:,3);
+    P    = ttx_list(:,4);
+    SNR  = ttx_list(:,5);
+    ttx_table = table(Time, PRN, TTX, P, SNR); % Time 포함해서 테이블 생성
 end
 
 %%%%% sattelite Positioning function %%%%%
@@ -197,11 +300,13 @@ function [returnSatList] = sat_setting(Nav, ttx)
     returnSatList=sat_xyzlist;
 end
 
+% === 수정할 코드 ===
 function returnSatlist = sat_setting2(Nav, ttx)
+    Time = ttx.Time; % Time 가져오기!
     PRN = ttx.PRN;
     [x, y, z] = sat_Positioning(Nav,ttx);
     [az, el] = getAzEl(x,y,z);
-    returnSatlist = table(PRN, x,y,z,az,el);
+    returnSatlist = table(Time, PRN, x, y, z, az, el); % Time 포함해서 반환
 end
 
 
