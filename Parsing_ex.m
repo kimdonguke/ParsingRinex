@@ -1,14 +1,91 @@
 clear;
 clc;
 
+% ==========================================
+% 1. 경로 설정 및 저장 폴더 준비
+% ==========================================
 addpath(genpath('data'));
 addpath(genpath('functions'));
 
-[nav_data, nav_header] = rinexread("BRDC00IGS_R_20260120000_01D_MN.rnx");
-[obs_data, obs_header] = rinexread("YONS00KOR_R_20260120000_01D_30S_MO.rnx");
+obs_dir = fullfile('data', 'OBS');
+nav_dir = fullfile('data', 'NAV');
+save_dir = fullfile('data', 'PARSED_MAT');
 
-return_NAV = parsingNavigationBody(nav_data);
-return_OBS = parsingObsBody(obs_data);
+if ~exist(save_dir, 'dir')
+    mkdir(save_dir);
+    fprintf('  > [알림] 파싱 데이터 저장용 폴더 생성 완료: %s\n', save_dir);
+end
+
+% ==========================================
+% 2. OBS 데이터 일괄 파싱 및 저장 (중복 건너뛰기)
+% ==========================================
+fprintf('\n========================================\n');
+fprintf('[Start] OBS 데이터 일괄 파싱 시작\n');
+fprintf('========================================\n');
+
+obs_files = dir(fullfile(obs_dir, '*_MO.rnx'));
+
+for i = 1:length(obs_files)
+    filename = obs_files(i).name;
+    filepath = fullfile(obs_dir, filename);
+    
+    % 저장될 파일 경로 미리 계산
+    [~, name_only, ~] = fileparts(filename);
+    save_path = fullfile(save_dir, strcat(name_only, '_parsed.mat'));
+    
+    % 🔥 핵심 로직: 파일이 이미 존재하면 건너뛰기
+    if exist(save_path, 'file')
+        fprintf('  > [%02d/%02d] [PASS] 이미 파싱됨: %s\n', i, length(obs_files), filename);
+        continue; % 아래 코드를 실행하지 않고 다음 i로 넘어감
+    end
+    
+    fprintf('  > [%02d/%02d] 파싱 중: %s ... ', i, length(obs_files), filename);
+    
+    % 파싱 및 저장 수행
+    [obs_data, obs_header] = rinexread(filepath);
+    return_OBS = parsingObsBody(obs_data);
+    save(save_path, 'return_OBS', 'obs_header');
+    
+    fprintf('저장 완료!\n');
+end
+
+% ==========================================
+% 3. NAV 데이터 일괄 파싱 및 저장 (중복 건너뛰기)
+% ==========================================
+fprintf('\n========================================\n');
+fprintf('[Start] NAV 데이터 일괄 파싱 시작\n');
+fprintf('========================================\n');
+
+nav_files = dir(fullfile(nav_dir, '*_MN.rnx'));
+
+for i = 1:length(nav_files)
+    filename = nav_files(i).name;
+    filepath = fullfile(nav_dir, filename);
+    
+    % 저장될 파일 경로 미리 계산
+    [~, name_only, ~] = fileparts(filename);
+    save_path = fullfile(save_dir, strcat(name_only, '_parsed.mat'));
+    
+    % 🔥 핵심 로직: 파일이 이미 존재하면 건너뛰기
+    if exist(save_path, 'file')
+        fprintf('  > [%02d/%02d] [PASS] 이미 파싱됨: %s\n', i, length(nav_files), filename);
+        continue;
+    end
+    
+    fprintf('  > [%02d/%02d] 파싱 중: %s ... ', i, length(nav_files), filename);
+    
+    % 파싱 및 저장 수행
+    [nav_data, nav_header] = rinexread(filepath);
+    return_NAV = parsingNavigationBody(nav_data);
+    save(save_path, 'return_NAV', 'nav_header');
+    
+    fprintf('저장 완료!\n');
+end
+
+fprintf('\n========================================\n');
+fprintf('[End] 모든 데이터 처리 완료!\n');
+fprintf('========================================\n');
+
 
 %% Navigation Parsing %%
 %======================%
