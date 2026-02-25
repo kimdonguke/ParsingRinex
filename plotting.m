@@ -27,6 +27,42 @@ function a = aaaa()
     end
     xlabel('Time'); ylabel('MP (m)');
     
+    % 이상치 데이터 출력 예시
+    % 1. 데이터 추출
+    
+   
+    
+    x_raw = rad2deg(MPtable.el);
+    y_raw = MPtable.SNR1;
+    z_raw = abs(MPtable.MP_Hybrid);
+    
+    % 2. 데이터 격자화 (Scattered 데이터일 경우)
+    % 만약 x, y가 이미 규칙적인 격자의 벡터라면 바로 reshape을 쓰셔도 되지만,
+    % 일반적인 테이블 데이터라면 아래처럼 그리드를 생성하는 것이 정확합니다.
+    [X, Y] = meshgrid(unique(x_raw), unique(y_raw));
+    Z = griddata(x_raw, y_raw, z_raw, X, Y);
+    
+    % 3. 시각화
+    figure('Color', 'w');
+    surf(X, Y, Z);
+    
+    % 스타일링
+    shading interp;      % 면을 부드럽게 보정
+    colorbar;            % 색상 바 추가
+    colormap('jet');     % 색상 맵 설정 (데이터 변화가 잘 보임)
+    
+    % 라벨 설정
+    xlabel('Elevation Angle (deg)');
+    ylabel('SNR1');
+    zlabel('MP Hybrid');
+    title('Multi-path Hybrid Analysis');
+    
+    % 보기 편한 각도로 회전
+    view(45, 30);
+    grid on;
+    
+    
+    
     % =========================================================================
     % 2. MP raw 출력 (전체 위성, bias 포함)
     % =========================================================================
@@ -63,11 +99,23 @@ function a = aaaa()
     % (참고: 기존 xyz_table 대신 통합된 MPtable의 고도각 컬럼 'el' 사용 가정)
     % 만약 컬럼명이 'Elevation'이라면 MPtable.Elevation 으로 변경하세요.
     % =========================================================================
-    figure
-    title("Elevation vs SNR")
-    hold on; grid on;
-    plot(rad2deg(MPtable.el), MPtable.SNR1, 'o', 'MarkerSize', 2)
+    % 1. 위성 번호(PRN)별로 나누어 그리기 (MPtable에 PRN 열이 있다고 가정)
+    figure; hold on; grid on;
+    unique_prns = unique(MPtable.PRN); % PRN 열 이름을 확인하세요
+    
+    for i = 1:length(unique_prns)
+        idx = (MPtable.PRN == unique_prns(i));
+        plot(rad2deg(MPtable.el(idx)), MPtable.SNR1(idx), '.', 'MarkerSize', 5);
+    end
+    
     xlabel('Elevation [degree]'); ylabel('SNR');
+    title('Elevation vs SNR (Color by PRN)');
+    figure
+    plot3(rad2deg(MPtable.el), MPtable.SNR1, abs(MPtable.MP_Hybrid),'o','MarkerSize',2);
+    grid on
+    xlabel("el")
+    ylabel("SNR")
+    zlabel("MP")
     
     % =========================================================================
     % 5. 통계: Elevation - MP-combination
@@ -84,6 +132,8 @@ function a = aaaa()
     end
     ylim([-2.5 2.5]);
     xlabel('Elevation [degree]'); ylabel('MP (m)');
+    
+
     
     % =========================================================================
     % 6. 통계: SNR - MP combination (전체 위성 산점도 + 표준편차 오버레이)
